@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 XIAOZHI_MCP_URL = os.environ.get(
     "XIAOZHI_MCP_URL",
-    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI1OTIzNCwiZXhwIjoxODIzODE2ODM0fQ.3s6TbeNkN_Q09nEfJiEWYbtc3ZHdbByYWD6KRhNiFkabksbRfOdIUVqWkVnv7NSsNpDZb9KU1MpeDENB75C_Ug"
+    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDA4MSwiZXhwIjoxODIzODE3NjgxfQ.xP_dTwtYqQcfzCR9ILxjNOJC0V3SBPa5CUuXDI5eec_J6-OHLPDSdoS4AQGbbMJu_fgMpWDgt1yqh8q3ywP4fQ"
 )
 
 YT_PLAYER_URL = os.environ.get("YT_PLAYER_URL", "https://yt-player-m0wo.onrender.com")
@@ -60,14 +60,14 @@ async def handle_xiaozhi_messages(websocket):
                     "result": {
                         "tools": [
                             {
-                                "name": "play_music",
-                                "description": "Play or search a song from YouTube",
+                                "name": "search_youtube_audio",
+                                "description": "Fetches direct YouTube audio stream URL for any requested song or music query.",
                                 "inputSchema": {
                                     "type": "object",
                                     "properties": {
                                         "song_name": {
                                             "type": "string",
-                                            "description": "Name of the song or keywords to search"
+                                            "description": "Name of the song or keywords to search on YouTube"
                                         }
                                     },
                                     "required": ["song_name"]
@@ -84,7 +84,7 @@ async def handle_xiaozhi_messages(websocket):
                 tool_name = params.get("name")
                 arguments = params.get("arguments", {})
                 
-                if tool_name == "play_music":
+                if tool_name in ["search_youtube_audio", "play_music"]:
                     song_name = arguments.get("song_name", "")
                     logging.info(f"Xiaozhi requested song: {song_name}")
                     
@@ -117,7 +117,6 @@ async def connect_to_xiaozhi():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Background-e WebSocket loop shuru korbe server start howar sathe sathe
     asyncio.create_task(connect_to_xiaozhi())
     yield
 
