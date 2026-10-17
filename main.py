@@ -20,7 +20,7 @@ def read_root():
 # Xiaozhi MCP WebSocket URL
 XIAOZHI_MCP_URL = os.environ.get(
     "XIAOZHI_MCP_URL",
-    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI1NzAxMCwiZXhwIjoxODIzODE0NjEwfQ.rqZTk9FZoxvkXbuUeJ6uaYxDBRZ2AruLbo0sRdOMxXzzu4kUMZ9EAhVXBIMGFd-_26HnJCWxdwXzjWnRNjzXHA"
+    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI1ODU2NSwiZXhwIjoxODIzODE2MTY1fQ.AaALZ4noyh4EjoOYqGT6ldIztdm5gj5E1BXFiLuueWkqTxnwewCnyslel9E4CUsXb5AsivZOP2RFE4MTjYgfHA"
 )
 
 # আপনার Render-এ চলা YT-Player সার্ভিসের URL
@@ -29,7 +29,6 @@ YT_PLAYER_URL = os.environ.get("YT_PLAYER_URL", "https://yt-player-m0wo.onrender
 def search_youtube_audio(query):
     """yt-player service-এ রিকোয়েস্ট পাঠিয়ে অডিও লিঙ্ক উদ্ধার করা"""
     try:
-        # YT Player Endpoint-এ রিকোয়েস্ট পাঠানো
         response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
         if response.status_code == 200:
             data = response.json()
@@ -49,7 +48,6 @@ async def handle_xiaozhi_messages(websocket):
             msg_id = data.get("id")
             method = data.get("method")
             
-            # Xiaozhi Protocol Handshake
             if method == "initialize":
                 response = {
                     "jsonrpc": "2.0",
@@ -71,7 +69,6 @@ async def handle_xiaozhi_messages(websocket):
             elif method == "ping":
                 await websocket.send(json.dumps({"jsonrpc": "2.0", "id": msg_id, "result": {}}))
                 
-            # Xiaozhi-কে জানানো যে এই MCP দিয়ে গান প্লে করা যাবে
             elif method == "tools/list":
                 response = {
                     "jsonrpc": "2.0",
@@ -98,7 +95,6 @@ async def handle_xiaozhi_messages(websocket):
                 await websocket.send(json.dumps(response))
                 logging.info("Sent tools list to Xiaozhi")
                 
-            # Xiaozhi থেকে গান বাজানোর কমান্ড আসলে
             elif method == "tools/call":
                 params = data.get("params", {})
                 tool_name = params.get("name")
@@ -108,7 +104,6 @@ async def handle_xiaozhi_messages(websocket):
                     song_name = arguments.get("song_name", "")
                     logging.info(f"Xiaozhi requested song: {song_name}")
                     
-                    # yt-player-m0wo.onrender.com থেকে লিঙ্ক খোঁজা
                     audio_url = search_youtube_audio(song_name)
                     
                     if audio_url:
