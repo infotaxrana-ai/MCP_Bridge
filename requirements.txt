@@ -1,0 +1,5 @@
+mcp
+websockets
+yt-dlp
+requests
+asyncio
