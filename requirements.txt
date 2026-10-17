@@ -1,5 +1,5 @@
-mcp
+fastapi
+uvicorn
 websockets
-yt-dlp
 requests
 asyncio
