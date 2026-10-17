@@ -13,17 +13,31 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 XIAOZHI_MCP_URL = os.environ.get(
     "XIAOZHI_MCP_URL",
-    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDA4MSwiZXhwIjoxODIzODE3NjgxfQ.xP_dTwtYqQcfzCR9ILxjNOJC0V3SBPa5CUuXDI5eec_J6-OHLPDSdoS4AQGbbMJu_fgMpWDgt1yqh8q3ywP4fQ"
+    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDIwOSwiZXhwIjoxODIzODE3ODA5fQ.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
 YT_PLAYER_URL = os.environ.get("YT_PLAYER_URL", "https://yt-player-m0wo.onrender.com")
 
 def search_youtube_audio(query):
     try:
-        response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
+        # POST রিকোয়েস্ট পাঠানো হচ্ছে
+        response = requests.post(
+            f"{YT_PLAYER_URL}/play", 
+            params={"song": query}, 
+            json={"song": query}, 
+            timeout=15
+        )
+        
+        # যদি POST না মেনে GET চায় (Fallback)
+        if response.status_code == 405:
+            logging.info("POST method not allowed, trying GET method...")
+            response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
+
         if response.status_code == 200:
             data = response.json()
-            return data.get("url") or data.get("stream_url") or data.get("audio_url")
+            return data.get("url") or data.get("stream_url") or data.get("audio_url") or data.get("link")
+        else:
+            logging.error(f"yt-player returned status code: {response.status_code}")
     except Exception as e:
         logging.error(f"Error fetching audio from yt-player: {e}")
     return None
