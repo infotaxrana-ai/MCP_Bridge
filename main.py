@@ -20,18 +20,19 @@ YT_PLAYER_URL = os.environ.get("YT_PLAYER_URL", "https://yt-player-m0wo.onrender
 
 def search_youtube_audio(query):
     try:
-        # ১. প্রথমে GET মেথড দিয়ে ট্রাই করা যাক (যেহেতু বেশিরভাগ সিম্পল yt-player GET পছন্দ করে)
+        # ১. Prothomhe GET method-e 'song' parameter diye try korbe
         response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
         
-        # ২. যদি GET কাজ না করে 405 বা 422 দেয়, তবে POST মেথডে JSON বডি দিয়ে ট্রাই করবে
+        # ২. Jodi 405 ba 422 ase, tahole 'q' parameter diye GET try korbe
         if response.status_code in [405, 422]:
-            logging.info("GET method failed, trying POST with JSON body...")
-            response = requests.post(f"{YT_PLAYER_URL}/play", json={"song": query}, timeout=15)
+            response = requests.get(f"{YT_PLAYER_URL}/play", params={"q": query}, timeout=15)
 
-        # ৩. যদি তাও না হয়, তবে POST দিয়ে Form Data হিসেবে পাঠাবে
+        # ৩. Jodi GET fail kore, tahole POST method-e json body-তে 'query' ba 'song' pathabe
         if response.status_code in [405, 422]:
-            logging.info("POST JSON failed, trying POST with Form data...")
-            response = requests.post(f"{YT_PLAYER_URL}/play", data={"song": query}, timeout=15)
+            response = requests.post(f"{YT_PLAYER_URL}/play", json={"query": query}, timeout=15)
+
+        if response.status_code in [405, 422]:
+            response = requests.post(f"{YT_PLAYER_URL}/play", json={"song": query}, timeout=15)
 
         if response.status_code == 200:
             data = response.json()
