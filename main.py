@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from websockets.asyncio.client import connect
 from fastapi import FastAPI
 import uvicorn
+from youtubesearchpython import VideosSearch
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -16,18 +17,37 @@ XIAOZHI_MCP_URL = os.environ.get(
     "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDIwOSwiZXhwIjoxODIzODE3ODA5fQ.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
+# আপনার লাইভ হওয়া wader/ydls সার্ভারের URL সরাসরি এখানে ডিফল্ট বসানো
 YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://ydls.onrender.com")
 
-def generate_ydls_stream_url(youtube_url_or_query):
+def get_direct_youtube_link(query):
+    """
+    পাইথন সার্চ লাইব্রেরি দিয়ে ইউটিউব থেকে সরাসরি ১ সেকেন্ডে আসল ভিডিও লিঙ্ক বের করে।
+    """
     try:
-        if "youtube.com" not in youtube_url_or_query and "youtu.be" not in youtube_url_or_query:
-            search_query = f"ytsearch1:{youtube_url_or_query}"
-            encoded_query = urllib.parse.quote(search_query)
-            stream_url = f"{YDLS_SERVER_URL}/mp3/{encoded_query}"
+        logging.info(f"Searching YouTube via python for: {query}")
+        videos_search = VideosSearch(query, limit=1)
+        results = videos_search.result()
+        if results and results.get("result"):
+            video_url = results["result"][0]["link"] # প্রথম রেজাল্টের ডিরেক্ট লিঙ্ক
+            logging.info(f"Found YouTube URL successfully: {video_url}")
+            return video_url
+    except Exception as e:
+        logging.error(f"YouTube search python library error: {e}")
+    return None
+
+def generate_ydls_stream_url(song_name_or_link):
+    try:
+        # যদি সরাসরি লিঙ্ক না হয়, তবে পাইথন দিয়েই আগে সার্চ করে আসল লিঙ্কটি বের করে নেবে
+        if "youtube.com" not in song_name_or_link and "youtu.be" not in song_name_or_link:
+            direct_video_url = get_direct_youtube_link(song_name_or_link)
+            if not direct_video_url:
+                return None
+            stream_url = f"{YDLS_SERVER_URL}/mp3/{direct_video_url}"
         else:
-            stream_url = f"{YDLS_SERVER_URL}/mp3/{youtube_url_or_query}"
+            stream_url = f"{YDLS_SERVER_URL}/mp3/{song_name_or_link}"
             
-        logging.info(f"Generated YDLS Stream URL: {stream_url}")
+        logging.info(f"Final Clean Output YDLS Stream URL: {stream_url}")
         return stream_url
     except Exception as e:
         logging.error(f"Error generating stream URL: {e}")
@@ -53,7 +73,6 @@ async def handle_xiaozhi_messages(websocket):
                     }
                 }
                 await websocket.send(json.dumps(response))
-                logging.info("Sent initialize response to Xiaozhi")
                 
             elif method == "ping":
                 await websocket.send(json.dumps({"jsonrpc": "2.0", "id": msg_id, "result": {}}))
@@ -72,7 +91,7 @@ async def handle_xiaozhi_messages(websocket):
                                     "properties": {
                                         "song_name": {
                                             "type": "string",
-                                            "description": "Name of the song or specific YouTube video link"
+                                            "description": "Name of the song or keywords to search"
                                         }
                                     },
                                     "required": ["song_name"]
@@ -82,7 +101,6 @@ async def handle_xiaozhi_messages(websocket):
                     }
                 }
                 await websocket.send(json.dumps(response))
-                logging.info("Sent tools list to Xiaozhi")
                 
             elif method == "tools/call":
                 params = data.get("params", {})
@@ -95,7 +113,6 @@ async def handle_xiaozhi_messages(websocket):
                     
                     audio_url = generate_ydls_stream_url(song_name)
                     
-                    # 🚀 চূড়ান্ত সমাধান: টেক্সট নোটিফিকেশন এবং অডিও টাইপ প্রোটোকল একসাথে মোড়ক করে পাঠানো
                     if audio_url:
                         response = {
                             "jsonrpc": "2.0",
@@ -126,7 +143,7 @@ async def handle_xiaozhi_messages(websocket):
                         }
                         
                     await websocket.send(json.dumps(response))
-                    logging.info(f"Sent combined text and audio response to Xiaozhi for: {song_name}")
+                    logging.info(f"Sent combined response for: {song_name}")
 
         except Exception as e:
             logging.error(f"Error handling message: {e}")
