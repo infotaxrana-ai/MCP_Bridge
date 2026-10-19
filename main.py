@@ -16,22 +16,15 @@ XIAOZHI_MCP_URL = os.environ.get(
     "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDIwOSwiZXhwIjoxODIzODE3ODA5fQ.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
-# আপনার লাইভ হওয়া নতুন wader/ydls সার্ভারের URL সরাসরি এখানে বসিয়ে দেওয়া হলো
 YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://ydls.onrender.com")
 
 def generate_ydls_stream_url(youtube_url_or_query):
-    """
-    wader/ydls প্রোটোকল অনুযায়ী সরাসরি ক্লিকেবল এবং প্লে-যোগ্য অডিও লিঙ্ক তৈরি করে।
-    """
     try:
-        # ইউজার যদি সরাসরি ইউটিউব লিঙ্ক না দিয়ে শুধু গানের নাম বলে, তবে এটি ইউটিউব সার্চ প্রোটোকল জেনারেট করবে
         if "youtube.com" not in youtube_url_or_query and "youtu.be" not in youtube_url_or_query:
-            # ytsearch প্রোটোকল ব্যবহার করে wader/ydls প্রথম রেজাল্টটি প্লে করতে পারে
             search_query = f"ytsearch1:{youtube_url_or_query}"
             encoded_query = urllib.parse.quote(search_query)
             stream_url = f"{YDLS_SERVER_URL}/mp3/{encoded_query}"
         else:
-            # ইউজার সরাসরি ইউটিউব লিঙ্ক দিলে তা সরাসরি mp3 ফরম্যাটে স্ট্রিম হবে
             stream_url = f"{YDLS_SERVER_URL}/mp3/{youtube_url_or_query}"
             
         logging.info(f"Generated YDLS Stream URL: {stream_url}")
@@ -102,18 +95,34 @@ async def handle_xiaozhi_messages(websocket):
                     
                     audio_url = generate_ydls_stream_url(song_name)
                     
-                    # Xiaozhi প্রোটোকল টেক্সট রেসপন্সের ভেতরে অডিও ইউআরএল পেলে তা স্পikারে বাজানো শুরু করে
-                    result_text = f"Playing {song_name}: {audio_url}" if audio_url else f"Sorry, could not stream {song_name}"
-                        
-                    response = {
-                        "jsonrpc": "2.0",
-                        "id": msg_id,
-                        "result": {
-                            "content": [{"type": "text", "text": result_text}]
+                    # 🌟 পরিবর্তন: Xiaozhi স্পিকারের জন্য অডিও অবজেক্ট ফরম্যাটে রেসপন্স পাঠানো
+                    if audio_url:
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": msg_id,
+                            "result": {
+                                "content": [
+                                    {
+                                        "type": "audio", 
+                                        "audio": {
+                                            "url": audio_url,
+                                            "title": song_name
+                                        }
+                                    }
+                                ]
+                            }
                         }
-                    }
+                    else:
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": msg_id,
+                            "result": {
+                                "content": [{"type": "text", "text": f"Sorry, could not stream {song_name}"}]
+                            }
+                        }
+                        
                     await websocket.send(json.dumps(response))
-                    logging.info(f"Sent song result to Xiaozhi: {result_text}")
+                    logging.info(f"Sent structured audio response to Xiaozhi for: {song_name}")
 
         except Exception as e:
             logging.error(f"Error handling message: {e}")
