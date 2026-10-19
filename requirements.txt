@@ -1,5 +1,6 @@
-fastapi
-uvicorn
-websockets
-requests
-asyncio
+fastapi>=0.110.0
+uvicorn>=0.28.0
+websockets>=12.0
+requests>=2.31.0
+asyncio>=3.4.3
+youtube-search-python>=1.6.6
