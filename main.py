@@ -3,7 +3,7 @@ import os
 import sys
 import json
 import logging
-import requests
+import urllib.parse
 from contextlib import asynccontextmanager
 from websockets.asyncio.client import connect
 from fastapi import FastAPI
@@ -16,31 +16,28 @@ XIAOZHI_MCP_URL = os.environ.get(
     "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDIwOSwiZXhwIjoxODIzODE3ODA5fQ.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
-YT_PLAYER_URL = os.environ.get("YT_PLAYER_URL", "https://yt-player-m0wo.onrender.com")
+# আপনার লাইভ হওয়া নতুন wader/ydls সার্ভারের URL সরাসরি এখানে বসিয়ে দেওয়া হলো
+YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://ydls.onrender.com")
 
-def search_youtube_audio(query):
+def generate_ydls_stream_url(youtube_url_or_query):
+    """
+    wader/ydls প্রোটোকল অনুযায়ী সরাসরি ক্লিকেবল এবং প্লে-যোগ্য অডিও লিঙ্ক তৈরি করে।
+    """
     try:
-        # ১. Prothomhe GET method-e 'song' parameter diye try korbe
-        response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
-        
-        # ২. Jodi 405 ba 422 ase, tahole 'q' parameter diye GET try korbe
-        if response.status_code in [405, 422]:
-            response = requests.get(f"{YT_PLAYER_URL}/play", params={"q": query}, timeout=15)
-
-        # ৩. Jodi GET fail kore, tahole POST method-e json body-তে 'query' ba 'song' pathabe
-        if response.status_code in [405, 422]:
-            response = requests.post(f"{YT_PLAYER_URL}/play", json={"query": query}, timeout=15)
-
-        if response.status_code in [405, 422]:
-            response = requests.post(f"{YT_PLAYER_URL}/play", json={"song": query}, timeout=15)
-
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("url") or data.get("stream_url") or data.get("audio_url") or data.get("link")
+        # ইউজার যদি সরাসরি ইউটিউব লিঙ্ক না দিয়ে শুধু গানের নাম বলে, তবে এটি ইউটিউব সার্চ প্রোটোকল জেনারেট করবে
+        if "youtube.com" not in youtube_url_or_query and "youtu.be" not in youtube_url_or_query:
+            # ytsearch প্রোটোকল ব্যবহার করে wader/ydls প্রথম রেজাল্টটি প্লে করতে পারে
+            search_query = f"ytsearch1:{youtube_url_or_query}"
+            encoded_query = urllib.parse.quote(search_query)
+            stream_url = f"{YDLS_SERVER_URL}/mp3/{encoded_query}"
         else:
-            logging.error(f"yt-player returned status code: {response.status_code}, response: {response.text}")
+            # ইউজার সরাসরি ইউটিউব লিঙ্ক দিলে তা সরাসরি mp3 ফরম্যাটে স্ট্রিম হবে
+            stream_url = f"{YDLS_SERVER_URL}/mp3/{youtube_url_or_query}"
+            
+        logging.info(f"Generated YDLS Stream URL: {stream_url}")
+        return stream_url
     except Exception as e:
-        logging.error(f"Error fetching audio from yt-player: {e}")
+        logging.error(f"Error generating stream URL: {e}")
     return None
 
 async def handle_xiaozhi_messages(websocket):
@@ -75,14 +72,14 @@ async def handle_xiaozhi_messages(websocket):
                     "result": {
                         "tools": [
                             {
-                                "name": "search_youtube_audio",
-                                "description": "Fetches direct YouTube audio stream URL for any requested song or music query.",
+                                "name": "play_music",
+                                "description": "Plays any song or music from YouTube directly on Xiaozhi bot's speaker.",
                                 "inputSchema": {
                                     "type": "object",
                                     "properties": {
                                         "song_name": {
                                             "type": "string",
-                                            "description": "Name of the song or keywords to search on YouTube"
+                                            "description": "Name of the song or specific YouTube video link"
                                         }
                                     },
                                     "required": ["song_name"]
@@ -99,12 +96,14 @@ async def handle_xiaozhi_messages(websocket):
                 tool_name = params.get("name")
                 arguments = params.get("arguments", {})
                 
-                if tool_name in ["search_youtube_audio", "play_music"]:
+                if tool_name in ["play_music", "search_youtube_audio"]:
                     song_name = arguments.get("song_name", "")
                     logging.info(f"Xiaozhi requested song: {song_name}")
                     
-                    audio_url = search_youtube_audio(song_name)
-                    result_text = f"Playing {song_name}: {audio_url}" if audio_url else f"Sorry, could not find audio for {song_name}"
+                    audio_url = generate_ydls_stream_url(song_name)
+                    
+                    # Xiaozhi প্রোটোকল টেক্সট রেসপন্সের ভেতরে অডিও ইউআরএল পেলে তা স্পikারে বাজানো শুরু করে
+                    result_text = f"Playing {song_name}: {audio_url}" if audio_url else f"Sorry, could not stream {song_name}"
                         
                     response = {
                         "jsonrpc": "2.0",
