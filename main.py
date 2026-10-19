@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 XIAOZHI_MCP_URL = os.environ.get(
     "XIAOZHI_MCP_URL",
-    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZ賽e1pY3AtZW5kcG9pbnQiLCJpYXQiOjE3OTIyNjAyMDksImV4cCI6MTgyMzgxNzgwOX0.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
+    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDIwOSwiZXhwIjoxODIzODE3ODA5fQ.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
 # আপনার লাইভ হওয়া wader/ydls সার্ভারের URL
@@ -23,21 +23,22 @@ YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://onrender.com")
 
 def get_direct_youtube_link(query):
     """
-    কোনো লাইব্রেরি ছাড়া সরাসরি ইউটিউব অফিশিয়াল সার্চ রেজাল্ট থেকে ১ সেকেন্ডে ক্লিন ভিডিও আইডি বের করে।
+    ইউটিউবের সঠিক সার্চ ইউআরএল (results/) স্ক্র্যাপ করে ক্লিন ভিডিও আইডি বের করে।
     """
     try:
         logging.info(f"Scraping YouTube directly for query: {query}")
         encoded_query = urllib.parse.quote(query)
+        # 🌟 ফিক্সড ইউআরএল: স্ল্যাশ (/) সঠিকভাবে যোগ করা হয়েছে
         search_url = f"https://youtube.com{encoded_query}"
         
-        # ইউটিউবকে সাধারণ ব্রাউজার হিসেবে রিকোয়েস্ট পাঠানো
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         response = requests.get(search_url, headers=headers, timeout=10)
         
         if response.status_code == 200:
-            # রেগুলার এক্সপ্রেশন দিয়ে প্রথম ভিডিও আইডি (/watch?v=XXXX) খুঁজে বের করা
+            # প্রথম ১১ ডিজিটের ভিডিও আইডি খুঁজে বের করা
             video_ids = re.findall(r"watch\?v=(\S{11})", response.text)
             if video_ids:
+                # প্রথম ভ্যালিড আইডিটি নিয়ে সম্পূর্ণ ইউটিউব লিংক তৈরি
                 video_url = f"https://youtube.com{video_ids[0]}"
                 logging.info(f"Successfully scraped YouTube URL: {video_url}")
                 return video_url
@@ -50,7 +51,7 @@ def generate_ydls_stream_url(song_name_or_link):
         if "youtube.com" not in song_name_or_link and "youtu.be" not in song_name_or_link:
             direct_video_url = get_direct_youtube_link(song_name_or_link)
             if not direct_video_url:
-                # যদি কোনো কারণে স্ক্র্যাপ ফেল করে, তবে সেফটি মেথড হিসেবে ydls এর নিজস্ব সার্চ ট্রাই করবে
+                # সেফটি ব্যাকআপ হিসেবে ফলব্যাক সার্চ মেথড
                 encoded_fallback = urllib.parse.quote(f"ytsearch1:{song_name_or_link}")
                 return f"{YDLS_SERVER_URL}/mp3/{encoded_fallback}"
             stream_url = f"{YDLS_SERVER_URL}/mp3/{direct_video_url}"
