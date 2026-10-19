@@ -20,24 +20,24 @@ YT_PLAYER_URL = os.environ.get("YT_PLAYER_URL", "https://yt-player-m0wo.onrender
 
 def search_youtube_audio(query):
     try:
-        # POST রিকোয়েস্ট পাঠানো হচ্ছে
-        response = requests.post(
-            f"{YT_PLAYER_URL}/play", 
-            params={"song": query}, 
-            json={"song": query}, 
-            timeout=15
-        )
+        # ১. প্রথমে GET মেথড দিয়ে ট্রাই করা যাক (যেহেতু বেশিরভাগ সিম্পল yt-player GET পছন্দ করে)
+        response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
         
-        # যদি POST না মেনে GET চায় (Fallback)
-        if response.status_code == 405:
-            logging.info("POST method not allowed, trying GET method...")
-            response = requests.get(f"{YT_PLAYER_URL}/play", params={"song": query}, timeout=15)
+        # ২. যদি GET কাজ না করে 405 বা 422 দেয়, তবে POST মেথডে JSON বডি দিয়ে ট্রাই করবে
+        if response.status_code in [405, 422]:
+            logging.info("GET method failed, trying POST with JSON body...")
+            response = requests.post(f"{YT_PLAYER_URL}/play", json={"song": query}, timeout=15)
+
+        # ৩. যদি তাও না হয়, তবে POST দিয়ে Form Data হিসেবে পাঠাবে
+        if response.status_code in [405, 422]:
+            logging.info("POST JSON failed, trying POST with Form data...")
+            response = requests.post(f"{YT_PLAYER_URL}/play", data={"song": query}, timeout=15)
 
         if response.status_code == 200:
             data = response.json()
             return data.get("url") or data.get("stream_url") or data.get("audio_url") or data.get("link")
         else:
-            logging.error(f"yt-player returned status code: {response.status_code}")
+            logging.error(f"yt-player returned status code: {response.status_code}, response: {response.text}")
     except Exception as e:
         logging.error(f"Error fetching audio from yt-player: {e}")
     return None
