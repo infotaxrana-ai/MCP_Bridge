@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 XIAOZHI_MCP_URL = os.environ.get(
     "XIAOZHI_MCP_URL",
-    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjQyMzUyMywiZXhwIjoxODIzOTgxMTIzfQ.QeMQLwx8_zzIB6fl5qOW9oK-nXK8LP0uWuGAMDEoCPSlJRXnaLpxvxAJlSOOXHS5SGcRiE5uI9Y02NmcCRVdpA"
+    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjI2MDIwOSwiZXhwIjoxODIzODE3ODA5fQ.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
 YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://ydls.onrender.com")
@@ -95,13 +95,17 @@ async def handle_xiaozhi_messages(websocket):
                     
                     audio_url = generate_ydls_stream_url(song_name)
                     
-                    # 🌟 পরিবর্তন: Xiaozhi স্পিকারের জন্য অডিও অবজেক্ট ফরম্যাটে রেসপন্স পাঠানো
+                    # 🚀 চূড়ান্ত সমাধান: টেক্সট নোটিফিকেশন এবং অডিও টাইপ প্রোটোকল একসাথে মোড়ক করে পাঠানো
                     if audio_url:
                         response = {
                             "jsonrpc": "2.0",
                             "id": msg_id,
                             "result": {
                                 "content": [
+                                    {
+                                        "type": "text",
+                                        "text": f"অবশ্যই, আমি আপনার জন্য {song_name} গানটি প্লে করছি।"
+                                    },
                                     {
                                         "type": "audio", 
                                         "audio": {
@@ -117,12 +121,12 @@ async def handle_xiaozhi_messages(websocket):
                             "jsonrpc": "2.0",
                             "id": msg_id,
                             "result": {
-                                "content": [{"type": "text", "text": f"Sorry, could not stream {song_name}"}]
+                                "content": [{"type": "text", "text": f"দুঃখিত, {song_name} গানটি খুঁজে পাওয়া যায়নি।"}]
                             }
                         }
                         
                     await websocket.send(json.dumps(response))
-                    logging.info(f"Sent structured audio response to Xiaozhi for: {song_name}")
+                    logging.info(f"Sent combined text and audio response to Xiaozhi for: {song_name}")
 
         except Exception as e:
             logging.error(f"Error handling message: {e}")
