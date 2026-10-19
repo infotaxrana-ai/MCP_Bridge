@@ -4,50 +4,60 @@ import sys
 import json
 import logging
 import urllib.parse
+import re
+import requests
 from contextlib import asynccontextmanager
 from websockets.asyncio.client import connect
 from fastapi import FastAPI
 import uvicorn
-from youtubesearchpython import VideosSearch
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 XIAOZHI_MCP_URL = os.environ.get(
     "XIAOZHI_MCP_URL",
-    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZSI6Im1jcC1lbmRwb2ludCIsImlhdCI6MTc5MjQyNDQ5MiwiZXhwIjoxODIzOTgyMDkyfQ.6znMa2BiDZ0Rlb40D0BG_9cTaEOLYdy6ND6B2evyLPENgNPW8B0DaSllQ9A4Bm4qydcSYHrrumkCdHlFbY8dmA"
+    "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMzIwNzcsImFnZW50SWQiOjI0OTc5NTgsImVuZHBvaW50SWQiOiJhZ2VudF8yNDk3OTU4IiwicHVycG9zZ賽e1pY3AtZW5kcG9pbnQiLCJpYXQiOjE3OTIyNjAyMDksImV4cCI6MTgyMzgxNzgwOX0.7KZPdba8W4V3F9Dns8NYVbdosoLxIoDsNzsEwl42ygnDulFZzQa2iKNX8Yqvad-6tJoaqyTRPXkDsmoi3YtrXw"
 )
 
-# আপনার লাইভ হওয়া wader/ydls সার্ভারের URL সরাসরি এখানে ডিফল্ট বসানো
-YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://ydls.onrender.com")
+# আপনার লাইভ হওয়া wader/ydls সার্ভারের URL
+YDLS_SERVER_URL = os.environ.get("YT_PLAYER_URL", "https://onrender.com")
 
 def get_direct_youtube_link(query):
     """
-    পাইথন সার্চ লাইব্রেরি দিয়ে ইউটিউব থেকে সরাসরি ১ সেকেন্ডে আসল ভিডিও লিঙ্ক বের করে।
+    কোনো লাইব্রেরি ছাড়া সরাসরি ইউটিউব অফিশিয়াল সার্চ রেজাল্ট থেকে ১ সেকেন্ডে ক্লিন ভিডিও আইডি বের করে।
     """
     try:
-        logging.info(f"Searching YouTube via python for: {query}")
-        videos_search = VideosSearch(query, limit=1)
-        results = videos_search.result()
-        if results and results.get("result"):
-            video_url = results["result"][0]["link"] # প্রথম রেজাল্টের ডিরেক্ট লিঙ্ক
-            logging.info(f"Found YouTube URL successfully: {video_url}")
-            return video_url
+        logging.info(f"Scraping YouTube directly for query: {query}")
+        encoded_query = urllib.parse.quote(query)
+        search_url = f"https://youtube.com{encoded_query}"
+        
+        # ইউটিউবকে সাধারণ ব্রাউজার হিসেবে রিকোয়েস্ট পাঠানো
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+        response = requests.get(search_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            # রেগুলার এক্সপ্রেশন দিয়ে প্রথম ভিডিও আইডি (/watch?v=XXXX) খুঁজে বের করা
+            video_ids = re.findall(r"watch\?v=(\S{11})", response.text)
+            if video_ids:
+                video_url = f"https://youtube.com{video_ids[0]}"
+                logging.info(f"Successfully scraped YouTube URL: {video_url}")
+                return video_url
     except Exception as e:
-        logging.error(f"YouTube search python library error: {e}")
+        logging.error(f"Direct YouTube scrape error: {e}")
     return None
 
 def generate_ydls_stream_url(song_name_or_link):
     try:
-        # যদি সরাসরি লিঙ্ক না হয়, তবে পাইথন দিয়েই আগে সার্চ করে আসল লিঙ্কটি বের করে নেবে
         if "youtube.com" not in song_name_or_link and "youtu.be" not in song_name_or_link:
             direct_video_url = get_direct_youtube_link(song_name_or_link)
             if not direct_video_url:
-                return None
+                # যদি কোনো কারণে স্ক্র্যাপ ফেল করে, তবে সেফটি মেথড হিসেবে ydls এর নিজস্ব সার্চ ট্রাই করবে
+                encoded_fallback = urllib.parse.quote(f"ytsearch1:{song_name_or_link}")
+                return f"{YDLS_SERVER_URL}/mp3/{encoded_fallback}"
             stream_url = f"{YDLS_SERVER_URL}/mp3/{direct_video_url}"
         else:
             stream_url = f"{YDLS_SERVER_URL}/mp3/{song_name_or_link}"
             
-        logging.info(f"Final Clean Output YDLS Stream URL: {stream_url}")
+        logging.info(f"Final Stream URL generated for bot: {stream_url}")
         return stream_url
     except Exception as e:
         logging.error(f"Error generating stream URL: {e}")
